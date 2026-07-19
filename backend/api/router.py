@@ -407,8 +407,47 @@ async def v2_manual_order(request: ManualOrderRequest) -> dict:
     }
 
 
-@router.post("/analyze", response_model=StrategyAnalysis)
-async def v2_analyze(request: AnalyzeRequest) -> StrategyAnalysis:
+@router.get("/broker/status")
+async def v2_broker_status() -> dict:
+    """Broker connection state and account summary for LLM context access."""
+    return get_broker_status().model_dump(mode="json")
+
+
+@router.get("/broker/bars")
+async def v2_broker_bars(symbol: str, tf: str = "H1", n: int = 100) -> dict:
+    """Recent OHLCV bars for a symbol/timeframe — intended for LLM context access."""
+    n = max(1, min(5000, n))
+    try:
+        df = get_bars(symbol.upper(), tf.upper(), n)
+    except MarketDataError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    bars = [
+        {
+            "time": int(ts.timestamp()),
+            "open": float(row.open),
+            "high": float(row.high),
+            "low": float(row.low),
+            "close": float(row.close),
+        }
+        for ts, row in df[["open", "high", "low", "close"]].iterrows()
+    ]
+    return {"symbol": symbol.upper(), "tf": tf.upper(), "bars": bars}
+
+
+@router.get("/broker/positions")
+async def v2_broker_positions() -> list:
+    """Open broker positions — intended for LLM context access."""
+    return list_positions()
+
+
+@router.get("/broker/symbols")
+async def v2_broker_symbols() -> dict:
+    """Available broker symbols — intended for LLM context access."""
+    return {"symbols": list_symbols()}
+
+
+
     config = _current_config()
     try:
         strategy = get_strategy(request.strategy)

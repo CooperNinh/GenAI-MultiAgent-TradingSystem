@@ -10,7 +10,7 @@ import httpx
 from backend.llm_analyzer import FALLBACK_MODEL, MODEL_DEFAULT, _ollama_generate
 from backend.services import model_service
 
-SUPPORTED_PROVIDERS = ("ollama", "gemini")
+SUPPORTED_PROVIDERS = ("ollama", "gemini", "lmstudio")
 _GEMINI_API_BASE = os.getenv("GEMINI_API_BASE", "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
 _GEMINI_DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 _GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-pro").strip()
@@ -19,6 +19,9 @@ _GEMINI_MODELS = [
     for item in os.getenv("GEMINI_MODELS", "gemini-2.5-flash,gemini-2.5-pro").split(",")
     if item.strip()
 ]
+
+_LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234").rstrip("/")
+_LM_STUDIO_DEFAULT_MODEL = os.getenv("LM_STUDIO_MODEL", "").strip()
 
 
 def normalize_provider(value: str | None) -> str:
@@ -30,6 +33,7 @@ def provider_catalog() -> List[Dict[str, Any]]:
     return [
         {"key": "ollama", "label": "Ollama", "configured": True},
         {"key": "gemini", "label": "Gemini", "configured": bool(os.getenv("GEMINI_API_KEY", "").strip())},
+        {"key": "lmstudio", "label": "LM Studio", "configured": True},
     ]
 
 
@@ -41,7 +45,27 @@ def default_model(provider: str | None) -> str:
     provider_key = normalize_provider(provider)
     if provider_key == "gemini":
         return _GEMINI_DEFAULT_MODEL
+    if provider_key == "lmstudio":
+        return _LM_STUDIO_DEFAULT_MODEL
     return MODEL_DEFAULT
+
+
+async def _fetch_lmstudio_models(timeout: float = 10.0) -> List[str]:
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(f"{_LM_STUDIO_URL}/v1/models")
+        if response.status_code != 200:
+            return []
+        payload = response.json()
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, list):
+            return []
+        return sorted(
+            {item["id"] for item in data if isinstance(item, dict) and item.get("id")},
+            key=str.lower,
+        )
+    except Exception:
+        return []
 
 
 async def models_payload(provider: str | None = None, timeout: float = 10.0) -> Dict[str, Any]:
@@ -58,6 +82,14 @@ async def models_payload(provider: str | None = None, timeout: float = 10.0) -> 
         payload["models"] = list(_GEMINI_MODELS)
         if not os.getenv("GEMINI_API_KEY", "").strip():
             payload["error"] = "Gemini API key is not configured."
+        return payload
+
+    if provider_key == "lmstudio":
+        models = await _fetch_lmstudio_models(timeout=timeout)
+        payload["models"] = models
+        payload["fallback"] = None
+        if not models:
+            payload["error"] = "LM Studio is not reachable or has no loaded models."
         return payload
 
     result = await model_service.fetch_tags(timeout=timeout)
@@ -137,6 +169,32 @@ async def _generate_with_gemini(prompt: str, model: str, timeout: float, num_pre
     return text
 
 
+async def _generate_with_lmstudio(prompt: str, model: str, timeout: float, num_predict: int) -> str:
+    url = f"{_LM_STUDIO_URL}/v1/chat/completions"
+    body: Dict[str, Any] = {
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max(256, num_predict),
+        "temperature": 0.2,
+    }
+    if model:
+        body["model"] = model
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(url, json=body)
+    if response.status_code >= 400:
+        raise RuntimeError(f"LM Studio error {response.status_code}: {response.text[:240]}")
+    try:
+        payload = response.json()
+    except Exception as exc:
+        raise RuntimeError(f"LM Studio returned invalid JSON: {exc}") from exc
+    try:
+        text = payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError(f"LM Studio returned an unexpected response format: {exc}") from exc
+    if not text:
+        raise RuntimeError("LM Studio returned an empty response.")
+    return str(text).strip()
+
+
 async def generate_text(
     *,
     prompt: str,
@@ -150,6 +208,8 @@ async def generate_text(
 
     if provider_key == "gemini":
         text = await _generate_with_gemini(prompt=prompt, model=model_name, timeout=timeout, num_predict=num_predict)
+    elif provider_key == "lmstudio":
+        text = await _generate_with_lmstudio(prompt=prompt, model=model_name, timeout=timeout, num_predict=num_predict)
     else:
         available = await model_service.fetch_tags(timeout=min(timeout, 5.0))
         discovered_models = available.get("models") if isinstance(available, dict) else []

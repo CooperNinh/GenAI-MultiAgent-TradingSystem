@@ -155,7 +155,11 @@ export default function StrategyStudioPage() {
       })
       .catch((e: any) => {
         if (!mounted) return;
-        setProviders([{ key: 'ollama', label: 'Ollama', configured: true }, { key: 'gemini', label: 'Gemini', configured: false }]);
+        setProviders([
+          { key: 'ollama', label: 'Ollama', configured: true },
+          { key: 'gemini', label: 'Gemini', configured: false },
+          { key: 'lmstudio', label: 'LM Studio', configured: true },
+        ]);
         setLlmModels([]);
         setLlmModel('');
         setLlmModelError(e?.message || 'Failed to load models');
