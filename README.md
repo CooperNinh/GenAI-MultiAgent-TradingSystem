@@ -109,7 +109,7 @@ The project is intended to show AI product engineering rather than prompt-only e
 ### Strategy Studio
 
 - natural-language strategy chat
-- provider/model selection
+- provider/model selection (Ollama, Gemini, LM Studio)
 - draft strategy generation and refinement
 - save-to-disk strategy workflow
 - saved and draft backtesting
@@ -150,7 +150,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the current diagrams, agent-role mapp
 - React 19 + Vite + TypeScript
 - SQLite
 - cTrader Open API integration
-- Ollama and Gemini-ready model routing for Strategy Studio
+- Ollama, Gemini, and LM Studio model routing for Strategy Studio
 - Recharts and lightweight-charts
 
 ## Quick Start

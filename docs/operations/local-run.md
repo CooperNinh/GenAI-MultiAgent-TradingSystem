@@ -58,11 +58,41 @@ This script kills listeners on ports `4000` and `5173` and aggressively cleans u
 - `APP_START_CTRADER_ON_BOOT=1`
   start broker transport at boot
 - `APP_WARM_OLLAMA_ON_BOOT=1`
-  warm the configured local model path at boot
+  warm the configured local model path at boot (skipped automatically when `STUDIO_LLM_PROVIDER=lmstudio`)
 - `APP_START_CTRADER_ON_BOOT=0`
   useful for tests or offline API work
 - `APP_WARM_OLLAMA_ON_BOOT=0`
   useful if you want backend startup without model warmup
+
+### LLM provider flags
+
+By default the backend uses Ollama for Strategy Studio. Set `STUDIO_LLM_PROVIDER` to switch providers.
+
+#### Ollama (default)
+
+```powershell
+set OLLAMA_URL=http://127.0.0.1:11434
+set OLLAMA_MODEL=phi3:mini
+```
+
+#### Gemini
+
+```powershell
+set STUDIO_LLM_PROVIDER=gemini
+set GEMINI_API_KEY=your_key_here
+```
+
+Optional overrides: `GEMINI_MODEL` (default `gemini-2.5-flash`), `GEMINI_FALLBACK_MODEL`, `GEMINI_MODELS` (comma-separated list).
+
+#### LM Studio
+
+```powershell
+set STUDIO_LLM_PROVIDER=lmstudio
+set LM_STUDIO_URL=http://127.0.0.1:1234
+set LM_STUDIO_MODEL=your-loaded-model-name
+```
+
+LM Studio exposes an OpenAI-compatible REST API. No extra Python packages are required. `LM_STUDIO_URL` must be explicitly set for the provider to show as configured in the Strategy Studio UI.
 
 ### Frontend API target
 
