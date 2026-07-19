@@ -23,6 +23,9 @@ _GEMINI_MODELS = [
 _LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234").rstrip("/")
 _LM_STUDIO_DEFAULT_MODEL = os.getenv("LM_STUDIO_MODEL", "").strip()
 
+_MIN_TOKENS = 256          # floor for max_tokens / maxOutputTokens passed to any provider
+_MAX_ERROR_TEXT = 240      # truncation limit for raw provider error bodies logged to callers
+
 
 def normalize_provider(value: str | None) -> str:
     provider = (value or "").strip().lower()
@@ -152,13 +155,13 @@ async def _generate_with_gemini(prompt: str, model: str, timeout: float, num_pre
         "generationConfig": {
             "temperature": 0.2,
             "topP": 0.9,
-            "maxOutputTokens": max(256, num_predict),
+            "maxOutputTokens": max(_MIN_TOKENS, num_predict),
         },
     }
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(url, params={"key": api_key}, json=body)
     if response.status_code >= 400:
-        raise RuntimeError(f"Gemini error {response.status_code}: {response.text[:240]}")
+        raise RuntimeError(f"Gemini error {response.status_code}: {response.text[:_MAX_ERROR_TEXT]}")
     try:
         payload = response.json()
     except Exception as exc:
@@ -173,7 +176,7 @@ async def _generate_with_lmstudio(prompt: str, model: str, timeout: float, num_p
     url = f"{_LM_STUDIO_URL}/v1/chat/completions"
     body: Dict[str, Any] = {
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": max(256, num_predict),
+        "max_tokens": max(_MIN_TOKENS, num_predict),
         "temperature": 0.2,
     }
     if model:
@@ -181,7 +184,7 @@ async def _generate_with_lmstudio(prompt: str, model: str, timeout: float, num_p
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(url, json=body)
     if response.status_code >= 400:
-        raise RuntimeError(f"LM Studio error {response.status_code}: {response.text[:240]}")
+        raise RuntimeError(f"LM Studio error {response.status_code}: {response.text[:_MAX_ERROR_TEXT]}")
     try:
         payload = response.json()
     except Exception as exc:

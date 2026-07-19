@@ -448,6 +448,8 @@ async def v2_broker_symbols() -> dict:
 
 
 
+@router.post("/analyze", response_model=StrategyAnalysis)
+async def v2_analyze(request: AnalyzeRequest) -> StrategyAnalysis:
     config = _current_config()
     try:
         strategy = get_strategy(request.strategy)
