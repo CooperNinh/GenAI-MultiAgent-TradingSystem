@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.strategy import load_generated_strategies
 from backend.adapters.ctrader import adapter as broker_adapter
 from backend.services import model_service
+from backend.services import studio_llm
 from backend.services.engine import engine as tradeagent_engine
 from backend.services.runtime_state import external_dependency_state
 
@@ -62,11 +63,14 @@ async def app_lifespan(_: FastAPI):
         print(f"[startup] Failed to load generated strategies: {exc}")
 
     if _env_flag("APP_WARM_OLLAMA_ON_BOOT", _boot_default()):
-        try:
-            external_dependency_state.ollama_reason = model_service.dispatch_warmup()
-            external_dependency_state.ollama_warmed = True
-        except Exception as exc:
-            external_dependency_state.ollama_reason = f"warmup failed: {exc}"
+        if studio_llm.default_provider() == studio_llm.PROVIDER_LMSTUDIO:
+            external_dependency_state.ollama_reason = "skipped: LM Studio is the configured default provider"
+        else:
+            try:
+                external_dependency_state.ollama_reason = model_service.dispatch_warmup()
+                external_dependency_state.ollama_warmed = True
+            except Exception as exc:
+                external_dependency_state.ollama_reason = f"warmup failed: {exc}"
     else:
         external_dependency_state.ollama_reason = "startup disabled by APP_WARM_OLLAMA_ON_BOOT"
 

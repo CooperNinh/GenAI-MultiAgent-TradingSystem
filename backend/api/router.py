@@ -407,6 +407,49 @@ async def v2_manual_order(request: ManualOrderRequest) -> dict:
     }
 
 
+@router.get("/broker/status")
+async def v2_broker_status() -> dict:
+    """Broker connection state and account summary for LLM context access."""
+    return get_broker_status().model_dump(mode="json")
+
+
+@router.get("/broker/bars")
+async def v2_broker_bars(symbol: str, tf: str = "H1", n: int = 100) -> dict:
+    """Recent OHLCV bars for a symbol/timeframe — intended for LLM context access.
+
+    n is clamped to [1, 5000] (the system-wide bar limit used across all bar endpoints).
+    """
+    n = max(1, min(5000, n))
+    try:
+        df = get_bars(symbol.upper(), tf.upper(), n)
+    except MarketDataError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    ohlc_df = df[["open", "high", "low", "close"]]
+    times = (ohlc_df.index.astype("int64") // 10**9).tolist()
+    opens = ohlc_df["open"].astype(float).tolist()
+    highs = ohlc_df["high"].astype(float).tolist()
+    lows = ohlc_df["low"].astype(float).tolist()
+    closes = ohlc_df["close"].astype(float).tolist()
+    bars = [
+        {"time": t, "open": o, "high": h, "low": lo, "close": c}
+        for t, o, h, lo, c in zip(times, opens, highs, lows, closes)
+    ]
+    return {"symbol": symbol.upper(), "tf": tf.upper(), "bars": bars}
+
+
+@router.get("/broker/positions")
+async def v2_broker_positions() -> list:
+    """Open broker positions — intended for LLM context access."""
+    return list_positions()
+
+
+@router.get("/broker/symbols")
+async def v2_broker_symbols() -> dict:
+    """Available broker symbols — intended for LLM context access."""
+    return {"symbols": list_symbols()}
+
+
 @router.post("/analyze", response_model=StrategyAnalysis)
 async def v2_analyze(request: AnalyzeRequest) -> StrategyAnalysis:
     config = _current_config()
