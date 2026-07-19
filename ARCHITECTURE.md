@@ -92,7 +92,7 @@ That distinction matters. In the current codebase, the runtime engine is not a s
 - Task router:
   `backend/services/studio_tasks.py`
 - LLM interface:
-  `backend/services/studio_llm.py`
+  `backend/services/studio_llm.py` — routes to Ollama, Gemini, or LM Studio based on `STUDIO_LLM_PROVIDER`
 - Fallback code generator:
   `backend/programmer_agent.py`
 - Backtest engine:
