@@ -25,8 +25,8 @@ _GEMINI_MODELS = [
 _LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234").rstrip("/")
 _LM_STUDIO_DEFAULT_MODEL = os.getenv("LM_STUDIO_MODEL", "").strip()
 
-_MIN_TOKENS = 256          # floor for max_tokens / maxOutputTokens passed to any provider
-_MAX_ERROR_TEXT = 240      # truncation limit for raw provider error bodies logged to callers
+_MIN_TOKENS = 256               # floor for max_tokens / maxOutputTokens passed to any provider
+_ERROR_TEXT_TRUNCATE_LEN = 240  # max chars of provider error body included in RuntimeError messages
 
 
 def normalize_provider(value: str | None) -> str:
@@ -35,13 +35,13 @@ def normalize_provider(value: str | None) -> str:
 
 
 def provider_catalog() -> List[Dict[str, Any]]:
-    # LM Studio: 'configured' is True only when LM_STUDIO_URL is explicitly set in the environment.
-    # Note: os.getenv("LM_STUDIO_URL", "") uses an empty-string fallback here, distinct from the
-    # http://127.0.0.1:1234 default used for the _LM_STUDIO_URL connection variable above.
-    # Ollama is always available as the default local provider.
     return [
+        # Ollama is always available as the default local provider.
         {"key": "ollama", "label": "Ollama", "configured": True},
         {"key": "gemini", "label": "Gemini", "configured": bool(os.getenv("GEMINI_API_KEY", "").strip())},
+        # LM Studio is considered configured only when LM_STUDIO_URL is explicitly set in the
+        # environment. Note: os.getenv("LM_STUDIO_URL", "") uses an empty-string fallback here,
+        # distinct from the http://127.0.0.1:1234 default used for the _LM_STUDIO_URL variable.
         {"key": "lmstudio", "label": "LM Studio", "configured": bool(os.getenv("LM_STUDIO_URL", "").strip())},
     ]
 
@@ -167,7 +167,7 @@ async def _generate_with_gemini(prompt: str, model: str, timeout: float, num_pre
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(url, params={"key": api_key}, json=body)
     if response.status_code >= 400:
-        raise RuntimeError(f"Gemini error {response.status_code}: {response.text[:_MAX_ERROR_TEXT]}")
+        raise RuntimeError(f"Gemini error {response.status_code}: {response.text[:_ERROR_TEXT_TRUNCATE_LEN]}")
     try:
         payload = response.json()
     except Exception as exc:
@@ -190,7 +190,7 @@ async def _generate_with_lmstudio(prompt: str, model: str, timeout: float, num_p
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(url, json=body)
     if response.status_code >= 400:
-        raise RuntimeError(f"LM Studio error {response.status_code}: {response.text[:_MAX_ERROR_TEXT]}")
+        raise RuntimeError(f"LM Studio error {response.status_code}: {response.text[:_ERROR_TEXT_TRUNCATE_LEN]}")
     try:
         payload = response.json()
     except Exception as exc:
