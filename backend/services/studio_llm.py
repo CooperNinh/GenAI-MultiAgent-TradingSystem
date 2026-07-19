@@ -35,7 +35,9 @@ def normalize_provider(value: str | None) -> str:
 
 
 def provider_catalog() -> List[Dict[str, Any]]:
-    # LM Studio is considered configured when LM_STUDIO_URL is explicitly set;
+    # LM Studio: 'configured' is True only when LM_STUDIO_URL is explicitly set in the environment.
+    # Note: os.getenv("LM_STUDIO_URL", "") uses an empty-string fallback here, distinct from the
+    # http://127.0.0.1:1234 default used for the _LM_STUDIO_URL connection variable above.
     # Ollama is always available as the default local provider.
     return [
         {"key": "ollama", "label": "Ollama", "configured": True},
@@ -199,7 +201,7 @@ async def _generate_with_lmstudio(prompt: str, model: str, timeout: float, num_p
         raise RuntimeError(f"LM Studio returned an unexpected response format: {exc}") from exc
     if not text:
         raise RuntimeError("LM Studio returned an empty response.")
-    return str(text)
+    return text
 
 
 async def generate_text(

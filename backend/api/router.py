@@ -425,15 +425,15 @@ async def v2_broker_bars(symbol: str, tf: str = "H1", n: int = 100) -> dict:
     except MarketDataError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    df_sub = df[["open", "high", "low", "close"]]
+    times = (df_sub.index.astype("int64") // 10**9).tolist()
+    opens = df_sub["open"].astype(float).tolist()
+    highs = df_sub["high"].astype(float).tolist()
+    lows = df_sub["low"].astype(float).tolist()
+    closes = df_sub["close"].astype(float).tolist()
     bars = [
-        {
-            "time": int(ts.timestamp()),
-            "open": float(row.open),
-            "high": float(row.high),
-            "low": float(row.low),
-            "close": float(row.close),
-        }
-        for ts, row in df[["open", "high", "low", "close"]].iterrows()
+        {"time": t, "open": o, "high": h, "low": lo, "close": c}
+        for t, o, h, lo, c in zip(times, opens, highs, lows, closes)
     ]
     return {"symbol": symbol.upper(), "tf": tf.upper(), "bars": bars}
 
@@ -448,7 +448,6 @@ async def v2_broker_positions() -> list:
 async def v2_broker_symbols() -> dict:
     """Available broker symbols — intended for LLM context access."""
     return {"symbols": list_symbols()}
-
 
 
 @router.post("/analyze", response_model=StrategyAnalysis)
