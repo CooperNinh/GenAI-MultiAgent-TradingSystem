@@ -63,7 +63,7 @@ async def app_lifespan(_: FastAPI):
         print(f"[startup] Failed to load generated strategies: {exc}")
 
     if _env_flag("APP_WARM_OLLAMA_ON_BOOT", _boot_default()):
-        if studio_llm.default_provider() == "lmstudio":
+        if studio_llm.default_provider() == studio_llm.PROVIDER_LMSTUDIO:
             external_dependency_state.ollama_reason = "skipped: LM Studio is the configured default provider"
         else:
             try:

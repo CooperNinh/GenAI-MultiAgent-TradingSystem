@@ -11,6 +11,8 @@ from backend.llm_analyzer import FALLBACK_MODEL, MODEL_DEFAULT, _ollama_generate
 from backend.services import model_service
 
 SUPPORTED_PROVIDERS = ("ollama", "gemini", "lmstudio")
+PROVIDER_LMSTUDIO = "lmstudio"  # named constant used by bootstrap and routing guards
+
 _GEMINI_API_BASE = os.getenv("GEMINI_API_BASE", "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
 _GEMINI_DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 _GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-pro").strip()
@@ -33,10 +35,12 @@ def normalize_provider(value: str | None) -> str:
 
 
 def provider_catalog() -> List[Dict[str, Any]]:
+    # LM Studio is considered configured when LM_STUDIO_URL is explicitly set;
+    # Ollama is always available as the default local provider.
     return [
         {"key": "ollama", "label": "Ollama", "configured": True},
         {"key": "gemini", "label": "Gemini", "configured": bool(os.getenv("GEMINI_API_KEY", "").strip())},
-        {"key": "lmstudio", "label": "LM Studio", "configured": True},
+        {"key": "lmstudio", "label": "LM Studio", "configured": bool(os.getenv("LM_STUDIO_URL", "").strip())},
     ]
 
 
@@ -195,7 +199,7 @@ async def _generate_with_lmstudio(prompt: str, model: str, timeout: float, num_p
         raise RuntimeError(f"LM Studio returned an unexpected response format: {exc}") from exc
     if not text:
         raise RuntimeError("LM Studio returned an empty response.")
-    return str(text).strip()
+    return str(text)
 
 
 async def generate_text(

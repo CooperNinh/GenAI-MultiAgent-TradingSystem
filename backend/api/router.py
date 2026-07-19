@@ -415,7 +415,10 @@ async def v2_broker_status() -> dict:
 
 @router.get("/broker/bars")
 async def v2_broker_bars(symbol: str, tf: str = "H1", n: int = 100) -> dict:
-    """Recent OHLCV bars for a symbol/timeframe — intended for LLM context access."""
+    """Recent OHLCV bars for a symbol/timeframe — intended for LLM context access.
+
+    n is clamped to [1, 5000] (the system-wide bar limit used across all bar endpoints).
+    """
     n = max(1, min(5000, n))
     try:
         df = get_bars(symbol.upper(), tf.upper(), n)
